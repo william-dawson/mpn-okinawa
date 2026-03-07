@@ -42,6 +42,7 @@ from .step_4_deltas         import apply_deltas
 from .step_5_labels         import canonicalize_labels
 from .step_6_cleanup        import cancel_terms
 from .step_6a_linked_cluster import filter_unlinked_diagrams
+from .step_6b_projection    import filter_energy_subspace
 from .step_7_output         import format_strings
 from .step_8_denominator    import extract_denominator
 
@@ -76,10 +77,11 @@ def _parse_op(s: str) -> Operator:
 
 class WickHelper:
 
-    def __init__(self, filter_unlinked: bool = True):
+    def __init__(self, filter_unlinked: bool = True, project_energy_subspace: bool = True):
         self._input_terms: List[Term] = []
         self._result:      List[Term] = []
         self._filter_unlinked = filter_unlinked
+        self._project_energy_subspace = project_energy_subspace
 
     def add_term(
         self,
@@ -124,6 +126,10 @@ class WickHelper:
 
         # 6. Cancel duplicate terms / sum factors
         terms = cancel_terms(terms)
+
+        # 6b. Project out odd occupied/virtual balance terms (MP energy subspace)
+        if self._project_energy_subspace:
+            terms = filter_energy_subspace(terms)
 
         # 6a. Optional: filter unlinked (disconnected) diagrams via linked-cluster theorem
         if self._filter_unlinked:

@@ -18,34 +18,17 @@ substitution.
 
 from __future__ import annotations
 from typing import List
-from .term import Term, Delta, is_occ, is_virt
+from .term import Term, Delta
 
 
-def _is_fresh(label: str) -> bool:
-    """Fresh labels have the form o<n> or v<n>."""
-    return (label.startswith('o') or label.startswith('v')) and label[1:].isdigit()
-
-
-def _prefer_keep(a: str, b: str) -> tuple:
-    """Return (keep, replace) choosing which label to eliminate."""
-    a_fresh = _is_fresh(a)
-    b_fresh = _is_fresh(b)
-
-    if a_fresh and not b_fresh:
-        return b, a   # keep conventional b, replace fresh a
-    if b_fresh and not a_fresh:
-        return a, b   # keep conventional a, replace fresh b
-    if a_fresh and b_fresh:
-        # both fresh: keep lower numeric index
-        na = int(a[1:])
-        nb = int(b[1:])
-        if na <= nb:
-            return a, b
-        return b, a
-    # both conventional: keep alphabetically first
-    if a <= b:
-        return a, b
-    return b, a
+def _count_in_tensors_and_ops(term: Term, label: str) -> int:
+    count = 0
+    for t in term.tensors:
+        count += t.indices.count(label)
+    for op in term.operators:
+        if op.label == label:
+            count += 1
+    return count
 
 
 def _apply_one_delta(term: Term) -> Term:
@@ -62,7 +45,15 @@ def _apply_one_delta(term: Term) -> Term:
         # delta(x, x) = 1, just remove it
         return Term(term.factor, term.sign, term.tensors, term.operators, remaining_deltas)
 
-    keep, replace = _prefer_keep(i, j)
+    # Emulate pdaggerq gobble_deltas preference:
+    # replace the first delta label if it appears in integrals/operators,
+    # otherwise replace the second one.
+    if _count_in_tensors_and_ops(term, i) > 0:
+        keep, replace = j, i
+    elif _count_in_tensors_and_ops(term, j) > 0:
+        keep, replace = i, j
+    else:
+        keep, replace = j, i
     mapping = {replace: keep}
 
     new_tensors = [t.renamed(mapping) for t in term.tensors]

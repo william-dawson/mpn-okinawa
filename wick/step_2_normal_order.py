@@ -77,7 +77,8 @@ def _swap_one(term: Term) -> List[Term]:
 
     if both_occ or both_virt:
         contr_ops  = ops[:i] + ops[i + 2:]
-        contr_deltas = list(term.deltas) + [Delta(ann.label, cre.label)]
+        d1, d2 = sorted((ann.label, cre.label))
+        contr_deltas = list(term.deltas) + [Delta(d1, d2)]
         contr_term = Term(
             term.factor,
             term.sign,

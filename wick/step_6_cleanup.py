@@ -9,7 +9,7 @@ Two passes:
 Canonicalization rules for <p,q||r,s>:
   - Sort bra (p,q) lexicographically, applying -1 if swapped
   - Sort ket (r,s) lexicographically, applying -1 if swapped
-  - Sort left-right blocks lexicographically (no sign change for <||>)
+  - Do not swap bra/ket blocks
 """
 
 from __future__ import annotations
@@ -43,10 +43,6 @@ def _canonicalize_integral_indices(integral_str: str) -> tuple[str, int]:
     if r > s:
         r, s = s, r
         sign *= -1
-
-    # Rule 3: sort left-right blocks (no sign change for <||>)
-    if (p, q) > (r, s):
-        p, q, r, s = r, s, p, q
 
     return (f"<{p},{q}||{r},{s}>", sign)
 

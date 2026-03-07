@@ -14,6 +14,7 @@ Usage:
 
 import sys
 import argparse
+import pdaggerq
 from wick.helper import WickHelper
 from wick.step_1_expand import expand_general_labels
 from wick.step_2_normal_order import normal_order_fermi_vacuum
@@ -89,6 +90,15 @@ def print_strings_with_denominators(strings_output, denominators, limit=10):
     print()
 
 
+def pdaggerq_reference_strings(num_v):
+    """Return pdaggerq strings() for an operator product of num_v 'v' terms."""
+    pq = pdaggerq.pq_helper("fermi")
+    pq.set_left_operators([['1']])
+    pq.add_operator_product(1.0, ['v'] * num_v)
+    pq.simplify()
+    return pq.strings()
+
+
 def run_example(name, factor, tensors, ops, verbose=False):
     """Run an example through the full pipeline with optional verbosity."""
     print_section(f"Running {name.upper()}")
@@ -97,6 +107,18 @@ def run_example(name, factor, tensors, ops, verbose=False):
     print(f"  factor = {factor}")
     print(f"  tensors = {tensors}")
     print(f"  ops = {ops}")
+
+    # Show reference result first (for standard MPn examples)
+    ref_strings = None
+    if name.lower().startswith("mp"):
+        try:
+            ref_strings = pdaggerq_reference_strings(len(tensors))
+            print_section("Reference (pdaggerq)")
+            print(f"pdaggerq output ({len(ref_strings)} terms):")
+            print_strings(sorted(ref_strings))
+        except Exception as exc:
+            print_section("Reference (pdaggerq)")
+            print(f"Could not compute pdaggerq reference: {exc}")
 
     # Create the term
     # Keep CLI examples aligned with pdaggerq strings() reference behavior.
@@ -109,8 +131,10 @@ def run_example(name, factor, tensors, ops, verbose=False):
         wh.simplify()
         result = wh.strings()
         denoms = wh.denominators()
-        print(f"Output ({len(result)} terms) with energy denominators:")
+        print(f"Our output ({len(result)} terms) with energy denominators:")
         print_strings_with_denominators(result, denoms)
+        if ref_strings is not None:
+            print(f"Exact string match vs pdaggerq: {sorted(result) == sorted(ref_strings)}")
         return result
 
     # Verbose mode: step through each stage
@@ -155,6 +179,8 @@ def run_example(name, factor, tensors, ops, verbose=False):
     denoms = [extract_denominator(term) for term in terms]
     print(f"Output: {len(denoms)} denominators")
     print_strings_with_denominators(result, denoms)
+    if ref_strings is not None:
+        print(f"Exact string match vs pdaggerq: {sorted(result) == sorted(ref_strings)}")
 
     return result
 
