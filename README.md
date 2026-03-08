@@ -18,9 +18,7 @@ pip install -e '.[test]'
 
 ## Simplification Strategy
 
-The project currently uses **manual consolidation rules by default** (`step_6_cleanup.cancel_terms`) because this path is currently the best balance of correctness and speed for MP1/MP2/MP3 runs.
-
-A graph-isomorphism consolidator is available as an **experimental alternative** (`step_6d_graph_isomorphism.cancel_terms_graph_isomorphic`) and can be enabled from the CLI.
+The project uses **manual consolidation rules** (`step_6_cleanup.cancel_terms`) for MP-style expressions.
 
 ## Pipeline (Default)
 
@@ -33,8 +31,7 @@ A graph-isomorphism consolidator is available as an **experimental alternative**
 5. `reclassify_occ_repulsion`
 6. `canonicalize_labels_pdaggerq_style`
 7. `cancel_terms` (default manual consolidation)
-8. `filter_connected_terms_graph` (optional)
-9. `filter_unlinked_diagrams` (optional)
+8. `filter_unlinked_diagrams` (optional)
 
 ## MP2 Workflow (Theory + Verbose Trace)
 
@@ -73,12 +70,6 @@ wick --mp2
 wick --mp3
 ```
 
-Try graph-isomorphic simplification (experimental):
-
-```bash
-wick --mp3 --graph-simplify
-```
-
 ## Modules
 
 - `wick/term.py`: core data structures and index-space helpers
@@ -90,8 +81,6 @@ wick --mp3 --graph-simplify
 - `wick/step_4b_reclassify.py`: occ-repulsion reclassification
 - `wick/step_5_labels.py`: pdaggerq-style label canonicalization
 - `wick/step_6_cleanup.py`: default manual cleanup/consolidation
-- `wick/step_6d_graph_isomorphism.py`: experimental graph-isomorphic consolidation
-- `wick/step_6c_graph_connected.py`: optional connected-term filter
 - `wick/step_6a_linked_cluster.py`: linked-diagram filter
 - `wick/step_7_output.py`: formatting to pdaggerq-style strings
 - `wick/step_8_denominator.py`: denominator extraction
