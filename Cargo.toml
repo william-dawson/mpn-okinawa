@@ -18,3 +18,7 @@ clap = { version = "4", features = ["derive"] }
 rustc-hash = "2"
 
 [dev-dependencies]
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

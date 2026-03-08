@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::term::{is_occ, is_virt, Tensor, Term};
 
@@ -88,13 +88,15 @@ fn normalize_labels(tensors: &[(String, Vec<String>)]) -> (TermCanonKey, i32) {
 fn term_key(term: &Term) -> (TermCanonKey, i32) {
     let mut occ_labels: Vec<String> = Vec::new();
     let mut virt_labels: Vec<String> = Vec::new();
+    let mut occ_seen: FxHashSet<&str> = FxHashSet::default();
+    let mut virt_seen: FxHashSet<&str> = FxHashSet::default();
 
     for t in &term.tensors {
         for idx in &t.indices {
-            if is_occ(idx) && !occ_labels.contains(idx) {
+            if is_occ(idx) && occ_seen.insert(idx) {
                 occ_labels.push(idx.clone());
             }
-            if is_virt(idx) && !virt_labels.contains(idx) {
+            if is_virt(idx) && virt_seen.insert(idx) {
                 virt_labels.push(idx.clone());
             }
         }
@@ -104,23 +106,28 @@ fn term_key(term: &Term) -> (TermCanonKey, i32) {
 
     let mut best_key: Option<TermCanonKey> = None;
     let mut best_sign = 1;
+    let mut occ_map: HashMap<String, String> =
+        HashMap::with_capacity(occ_labels.len() + virt_labels.len());
+    let mut rename_map: HashMap<String, String> =
+        HashMap::with_capacity(occ_labels.len() + virt_labels.len());
+    let mut canon_tensors: Vec<(String, Vec<String>)> = Vec::with_capacity(term.tensors.len());
 
-    let occ_perms = permutations(&occ_labels);
-    let virt_perms = permutations(&virt_labels);
-
-    for occ_perm in &occ_perms {
-        let mut occ_map: HashMap<String, String> = HashMap::new();
+    let mut occ_perm = occ_labels.clone();
+    loop {
+        occ_map.clear();
         for (orig, perm) in occ_labels.iter().zip(occ_perm.iter()) {
             occ_map.insert(orig.clone(), perm.clone());
         }
 
-        for virt_perm in &virt_perms {
-            let mut rename_map = occ_map.clone();
+        let mut virt_perm = virt_labels.clone();
+        loop {
+            rename_map.clear();
+            rename_map.extend(occ_map.iter().map(|(k, v)| (k.clone(), v.clone())));
             for (orig, perm) in virt_labels.iter().zip(virt_perm.iter()) {
                 rename_map.insert(orig.clone(), perm.clone());
             }
 
-            let mut canon_tensors: Vec<(String, Vec<String>)> = Vec::new();
+            canon_tensors.clear();
             let mut total_sign = 1;
 
             for tensor in &term.tensors {
@@ -142,26 +149,44 @@ fn term_key(term: &Term) -> (TermCanonKey, i32) {
                 best_key = Some(key);
                 best_sign = total_sign;
             }
+
+            if !next_permutation(&mut virt_perm) {
+                break;
+            }
+        }
+
+        if !next_permutation(&mut occ_perm) {
+            break;
         }
     }
 
     (best_key.unwrap_or_default(), best_sign)
 }
 
-fn permutations(items: &[String]) -> Vec<Vec<String>> {
-    if items.is_empty() {
-        return vec![vec![]];
+fn next_permutation(items: &mut [String]) -> bool {
+    if items.len() < 2 {
+        return false;
     }
-    let mut result = Vec::new();
-    for i in 0..items.len() {
-        let mut rest: Vec<String> = items.to_vec();
-        let item = rest.remove(i);
-        for mut perm in permutations(&rest) {
-            perm.insert(0, item.clone());
-            result.push(perm);
+
+    let mut i = items.len() - 2;
+    loop {
+        if items[i] < items[i + 1] {
+            break;
         }
+        if i == 0 {
+            items.reverse();
+            return false;
+        }
+        i -= 1;
     }
-    result
+
+    let mut j = items.len() - 1;
+    while items[j] <= items[i] {
+        j -= 1;
+    }
+    items.swap(i, j);
+    items[i + 1..].reverse();
+    true
 }
 
 pub fn cancel_terms(terms: &[Term]) -> Vec<Term> {

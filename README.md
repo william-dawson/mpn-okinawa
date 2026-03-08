@@ -2,6 +2,12 @@
 
 A Rust Wick-contraction pipeline for MP-style vacuum expectation values, with CLI comparison against `pdaggerq`.
 
+## Project Status Warning
+
+This codebase was generated and iterated during a hackathon (CompPhysHack 2026): https://qc-hybrid.github.io/CompPhysHack2026/
+
+It is a rapid prototype and should not be treated as production-ready software.
+
 ## Building
 
 ```bash

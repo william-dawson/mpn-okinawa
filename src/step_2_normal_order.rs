@@ -4,8 +4,6 @@
 //! out of Fermi-vacuum normal order (FV annihilator before FV creator).
 //! Generate swap + contraction terms until all terms are normal ordered.
 
-use std::rc::Rc;
-
 use rustc_hash::FxHashMap;
 
 use crate::term::{is_occ, is_virt, Delta, Operator, Term};
@@ -58,10 +56,11 @@ struct Expansion {
 
 fn expand_ops_memo(
     ops: &[IntOperator],
-    cache: &mut FxHashMap<Vec<IntOperator>, Rc<Vec<Expansion>>>,
-) -> Rc<Vec<Expansion>> {
-    if let Some(hit) = cache.get(ops) {
-        return Rc::clone(hit);
+    cache: &mut FxHashMap<Vec<IntOperator>, usize>,
+    memo_results: &mut Vec<Vec<Expansion>>,
+) -> usize {
+    if let Some(&hit) = cache.get(ops) {
+        return hit;
     }
 
     let result = match first_out_of_order(ops) {
@@ -81,8 +80,8 @@ fn expand_ops_memo(
             swap_ops.push(*cre);
             swap_ops.push(*ann);
             swap_ops.extend_from_slice(&ops[i + 2..]);
-            let swap_children = expand_ops_memo(&swap_ops, cache);
-            for child in swap_children.iter() {
+            let swap_children_idx = expand_ops_memo(&swap_ops, cache, memo_results);
+            for child in memo_results[swap_children_idx].iter() {
                 out.push(Expansion {
                     rel_sign: -child.rel_sign,
                     rel_deltas: child.rel_deltas.clone(),
@@ -104,8 +103,8 @@ fn expand_ops_memo(
                 };
                 let this_delta = IntDelta { i: d1, j: d2 };
 
-                let contr_children = expand_ops_memo(&contr_ops, cache);
-                for child in contr_children.iter() {
+                let contr_children_idx = expand_ops_memo(&contr_ops, cache, memo_results);
+                for child in memo_results[contr_children_idx].iter() {
                     // Parent contraction happens earlier than child contractions.
                     let mut deltas = Vec::with_capacity(child.rel_deltas.len() + 1);
                     deltas.push(this_delta);
@@ -122,9 +121,10 @@ fn expand_ops_memo(
         }
     };
 
-    let rc = Rc::new(result);
-    cache.insert(ops.to_vec(), Rc::clone(&rc));
-    rc
+    let idx = memo_results.len();
+    memo_results.push(result);
+    cache.insert(ops.to_vec(), idx);
+    idx
 }
 
 fn canonicalize_ops_for_cache(ops: &[Operator]) -> (Vec<IntOperator>, Vec<u16>, Vec<String>) {
@@ -183,36 +183,35 @@ fn remap_expansion_to_actual(
     canon_to_actual: &[u16],
     id_to_actual_label: &[String],
 ) -> (Vec<Operator>, Vec<Delta>) {
-    let operators = exp
-        .operators
-        .iter()
-        .map(|op| Operator {
+    let mut operators = Vec::with_capacity(exp.operators.len());
+    for op in exp.operators.iter() {
+        operators.push(Operator {
             label: id_to_actual_label[canon_to_actual[op.label as usize] as usize].clone(),
             dagger: op.dagger,
-        })
-        .collect();
+        });
+    }
 
-    let deltas = exp
-        .rel_deltas
-        .iter()
-        .map(|d| Delta {
+    let mut deltas = Vec::with_capacity(exp.rel_deltas.len());
+    for d in exp.rel_deltas.iter() {
+        deltas.push(Delta {
             i: id_to_actual_label[canon_to_actual[d.i as usize] as usize].clone(),
             j: id_to_actual_label[canon_to_actual[d.j as usize] as usize].clone(),
-        })
-        .collect();
+        });
+    }
 
     (operators, deltas)
 }
 
 pub fn normal_order_fermi_vacuum(terms: &[Term]) -> Vec<Term> {
     let mut ordered = Vec::new();
-    let mut cache: FxHashMap<Vec<IntOperator>, Rc<Vec<Expansion>>> = FxHashMap::default();
+    let mut cache: FxHashMap<Vec<IntOperator>, usize> = FxHashMap::default();
+    let mut memo_results: Vec<Vec<Expansion>> = Vec::new();
 
     for term in terms {
         let (canon_ops, canon_to_actual, id_to_actual_label) =
             canonicalize_ops_for_cache(&term.operators);
-        let expansions = expand_ops_memo(&canon_ops, &mut cache);
-        for exp in expansions.iter() {
+        let expansions_idx = expand_ops_memo(&canon_ops, &mut cache, &mut memo_results);
+        for exp in memo_results[expansions_idx].iter() {
             let (operators, rel_deltas_actual) =
                 remap_expansion_to_actual(exp, &canon_to_actual, &id_to_actual_label);
             let mut deltas = term.deltas.clone();
