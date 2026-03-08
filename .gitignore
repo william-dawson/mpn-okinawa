@@ -8,3 +8,8 @@ pdaggerq/
 
 # Archives
 *.zip
+
+# Packaging artifacts
+build/
+dist/
+*.egg-info/

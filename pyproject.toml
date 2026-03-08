@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "okinawa-wick"
+version = "0.1.0"
+description = "Pure-Python Wick-contraction engine for MP-style expressions"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Okinawa Contributors" }]
+license = { text = "Proprietary" }
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering :: Chemistry",
+  "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = []
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8",
+  "pdaggerq @ git+https://github.com/edeprince3/pdaggerq.git",
+]
+
+[project.scripts]
+wick = "wick.cli:main"
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+include = ["wick*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

@@ -2,6 +2,20 @@
 
 A pure Python Wick-contraction pipeline for MP-style vacuum expectation values, with CLI comparison against `pdaggerq`.
 
+## Installation
+
+Base package:
+
+```bash
+pip install -e .
+```
+
+Test/development extras (includes optional `pdaggerq` from GitHub):
+
+```bash
+pip install -e '.[test]'
+```
+
 ## Simplification Strategy
 
 The project currently uses **manual consolidation rules by default** (`step_6_cleanup.cancel_terms`) because this path is currently the best balance of correctness and speed for MP1/MP2/MP3 runs.
@@ -27,15 +41,15 @@ A graph-isomorphism consolidator is available as an **experimental alternative**
 Run MP examples:
 
 ```bash
-python wick_cli.py --mp1
-python wick_cli.py --mp2
-python wick_cli.py --mp3
+wick --mp1
+wick --mp2
+wick --mp3
 ```
 
 Try graph-isomorphic simplification (experimental):
 
 ```bash
-python wick_cli.py --mp3 --graph-simplify
+wick --mp3 --graph-simplify
 ```
 
 ## Modules
@@ -54,7 +68,7 @@ python wick_cli.py --mp3 --graph-simplify
 - `wick/step_6a_linked_cluster.py`: linked-diagram filter
 - `wick/step_7_output.py`: formatting to pdaggerq-style strings
 - `wick/step_8_denominator.py`: denominator extraction
-- `wick_cli.py`: interactive/non-interactive CLI
+- `wick/cli.py`: interactive/non-interactive CLI
 
 ## Tests
 
