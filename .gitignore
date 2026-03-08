@@ -1,15 +1,8 @@
-# Python
-__pycache__/
-*.pyc
-*.pyo
+# Rust
+/target
 
 # pdaggerq - reference documentation only
 pdaggerq/
 
 # Archives
 *.zip
-
-# Packaging artifacts
-build/
-dist/
-*.egg-info/

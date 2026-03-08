@@ -1,0 +1,19 @@
+[package]
+name = "okinawa-wick"
+version = "0.1.0"
+edition = "2021"
+description = "Wick-contraction engine for MP-style expressions"
+license = "Apache-2.0"
+
+[[bin]]
+name = "wick"
+path = "src/main.rs"
+
+[lib]
+name = "okinawa_wick"
+path = "src/lib.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+
+[dev-dependencies]
