@@ -16,6 +16,12 @@ Test/development extras (includes optional `pdaggerq` from GitHub):
 pip install -e '.[test]'
 ```
 
+## Attribution and Provenance
+
+This repository was developed with LLM assistance while giving the model direct access to the `pdaggerq` source code (https://github.com/edeprince3/pdaggerq). As a result, parts of this implementation were likely heavily influenced by `pdaggerq`, and were probably plagiarized heavily from its code structure and logic.
+
+The project is licensed under Apache License 2.0 to match `pdaggerq` (see `LICENSE`).
+
 ## Simplification Strategy
 
 The project uses **manual consolidation rules** (`step_6_cleanup.cancel_terms`) for MP-style expressions.
@@ -84,7 +90,7 @@ wick --mp3
 - `wick/step_6a_linked_cluster.py`: linked-diagram filter
 - `wick/step_7_output.py`: formatting to pdaggerq-style strings
 - `wick/step_8_denominator.py`: denominator extraction
-- `wick/cli.py`: interactive/non-interactive CLI
+- `wick/cli.py`: command-line interface
 
 ## Tests
 
