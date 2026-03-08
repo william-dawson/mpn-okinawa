@@ -69,7 +69,7 @@ def _canonicalize_tensor(tensor: Tensor) -> tuple[Tensor, int]:
 
 def _normalize_labels(
     tensors: List[tuple[str, tuple[str, ...]]]
-) -> tuple[tuple[str, tuple[str, ...]], ...]:
+) -> tuple[tuple[tuple[str, tuple[str, ...]], ...], int]:
     """
     Canonicalize dummy index names so equivalent summed-index terms merge.
     """
@@ -89,9 +89,17 @@ def _normalize_labels(
         return mapping[lbl]
 
     normalized = []
+    sign = 1
     for name, idxs in tensors:
-        normalized.append((name, tuple(map_label(x) for x in idxs)))
-    return tuple(normalized)
+        mapped = [map_label(x) for x in idxs]
+        if len(mapped) == 4:
+            t, s = _canonicalize_tensor(Tensor(name, mapped))
+            sign *= s
+            normalized.append((name, tuple(t.indices)))
+        else:
+            normalized.append((name, tuple(mapped)))
+    normalized.sort()
+    return tuple(normalized), sign
 
 
 def _term_key(term: Term) -> tuple[tuple[tuple[str, tuple[str, ...]], ...], int]:
@@ -119,7 +127,8 @@ def _term_key(term: Term) -> tuple[tuple[tuple[str, tuple[str, ...]], ...], int]
                 total_sign *= s
 
             canon_tensors.sort()
-            key = _normalize_labels(canon_tensors)
+            key, s2 = _normalize_labels(canon_tensors)
+            total_sign *= s2
 
             if best_key is None or key < best_key or (key == best_key and total_sign > best_sign):
                 best_key = key

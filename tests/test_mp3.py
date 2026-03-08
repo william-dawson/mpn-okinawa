@@ -20,12 +20,8 @@ def pdaggerq_mp3():
 
 def ours_mp3():
     # Match pdaggerq reference path exactly: no extra linked-diagram filtering.
-    wh = WickHelper(filter_unlinked=False)
-    wh.add_term(
-        1/64,
-        ['g(p,q,r,s)', 'g(t,u,v,w)', 'g(x,y,z,o)'],
-        ['+p','+q','-r','-s', '+t','+u','-v','-w', '+x','+y','-z','-o'],
-    )
+    wh = WickHelper(filter_unlinked=False, project_energy_subspace=False)
+    wh.add_operator_product(1.0, ['v', 'v', 'v'])
     wh.simplify()
     return wh.strings()
 

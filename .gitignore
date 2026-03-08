@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# pdaggerq - reference documentation only
+pdaggerq/
+
+# Archives
+*.zip

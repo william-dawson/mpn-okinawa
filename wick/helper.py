@@ -39,10 +39,12 @@ from .step_1_expand         import expand_general_labels
 from .step_2_normal_order   import normal_order_fermi_vacuum
 from .step_3_filter         import filter_fully_contracted
 from .step_4_deltas         import apply_deltas
-from .step_5_labels         import canonicalize_labels
+from .step_4b_reclassify    import reclassify_occ_repulsion
+from .step_5_labels         import canonicalize_labels_pdaggerq_style
 from .step_6_cleanup        import cancel_terms
 from .step_6a_linked_cluster import filter_unlinked_diagrams
 from .step_6b_projection    import filter_energy_subspace
+from .step_6c_graph_connected import filter_connected_terms_graph
 from .step_7_output         import format_strings
 from .step_8_denominator    import extract_denominator
 
@@ -77,11 +79,17 @@ def _parse_op(s: str) -> Operator:
 
 class WickHelper:
 
-    def __init__(self, filter_unlinked: bool = True, project_energy_subspace: bool = True):
+    def __init__(
+        self,
+        filter_unlinked: bool = True,
+        project_energy_subspace: bool = True,
+        graph_connected_only: bool = False,
+    ):
         self._input_terms: List[Term] = []
         self._result:      List[Term] = []
         self._filter_unlinked = filter_unlinked
         self._project_energy_subspace = project_energy_subspace
+        self._graph_connected_only = graph_connected_only
 
     def add_term(
         self,
@@ -104,6 +112,48 @@ class WickHelper:
         parsed_ops     = [_parse_op(o)     for o in ops]
         self._input_terms.append(Term(factor, 1, parsed_tensors, parsed_ops))
 
+    def add_operator_product(self, factor: float, ops: List[str]) -> None:
+        """
+        Minimal pdaggerq-style operator-product path for fluctuation potential terms.
+
+        Currently supports products composed only of 'v' operators.
+        """
+        if any(op.lower() != "v" for op in ops):
+            raise ValueError("add_operator_product currently supports only ['v', ...] inputs")
+
+        # Each v splits into:
+        #  j1: -1 * <?p||?q> with operators +p -q
+        #  j2: +1/4 * <p,q||s,r> with operators +p +q -r -s
+        branches = [(factor, [], [])]  # (coef, tensors, ops)
+        next_idx = 0
+
+        for _ in ops:
+            new_branches = []
+            for coef, tensors, op_list in branches:
+                p1 = f"p{next_idx}"; p2 = f"p{next_idx + 1}"
+                p3 = f"p{next_idx + 2}"; p4 = f"p{next_idx + 3}"
+
+                # j1 piece
+                new_branches.append((
+                    -coef,
+                    tensors + [Tensor("occ_repulsion", [p1, p2])],
+                    op_list + [Operator(p1, True), Operator(p2, False)],
+                ))
+
+                # j2 piece
+                new_branches.append((
+                    0.25 * coef,
+                    tensors + [Tensor("g", [p1, p2, p4, p3])],
+                    op_list + [Operator(p1, True), Operator(p2, True), Operator(p3, False), Operator(p4, False)],
+                ))
+
+            branches = new_branches
+            next_idx += 4
+
+        for coef, tensors, op_list in branches:
+            sign = 1 if coef >= 0 else -1
+            self._input_terms.append(Term(abs(coef), sign, tensors, op_list))
+
     def simplify(self) -> None:
         """Run the full pipeline."""
         terms = list(self._input_terms)
@@ -121,11 +171,18 @@ class WickHelper:
         # 4. Apply delta functions
         terms = apply_deltas(terms)
 
+        # 4b. Reclassify occ-repulsion intermediates into ERIs
+        terms = reclassify_occ_repulsion(terms)
+
         # 5. Canonicalize index labels
-        terms = canonicalize_labels(terms)
+        terms = canonicalize_labels_pdaggerq_style(terms)
 
         # 6. Cancel duplicate terms / sum factors
         terms = cancel_terms(terms)
+
+        # 6c. Optional graph-based connected filter.
+        if self._graph_connected_only:
+            terms = filter_connected_terms_graph(terms)
 
         # 6b. Project out odd occupied/virtual balance terms (MP energy subspace)
         if self._project_energy_subspace:

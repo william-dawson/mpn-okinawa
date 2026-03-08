@@ -62,12 +62,8 @@ def pdaggerq_mp2():
 
 def ours_mp2():
     # Match pdaggerq reference path exactly: no extra linked-diagram filtering.
-    wh = WickHelper(filter_unlinked=False)
-    wh.add_term(
-        1/16,
-        ['g(p,q,r,s)', 'g(t,u,v,w)'],
-        ['+p','+q','-r','-s', '+t','+u','-v','-w'],
-    )
+    wh = WickHelper(filter_unlinked=False, project_energy_subspace=False)
+    wh.add_operator_product(1.0, ['v', 'v'])
     wh.simplify()
     return wh.strings()
 

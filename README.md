@@ -5,8 +5,8 @@ A pure Python implementation of a Wick-contraction pipeline for MP-style vacuum 
 ## Current Status
 
 - MP1: matches `pdaggerq` in coefficient/structure up to dummy-index orientation.
-- MP2: core pipeline now removes the spurious singles-like residual and returns the expected linked piece in default mode.
-- MP3: still the main unresolved parity target versus `pdaggerq`.
+- MP2: parity-mode output has the correct two-term structure (orientation differences remain).
+- MP3: currently gives 5 terms in parity mode; 3 match textbook topologies (pp/hh/ph), 2 are disconnected leftovers.
 
 Important: this repository has two useful output modes for MP examples:
 
@@ -34,10 +34,11 @@ Order of display:
 2. `normal_order_fermi_vacuum`
 3. `filter_fully_contracted`
 4. `apply_deltas`
-5. `canonicalize_labels`
-6. `cancel_terms`
-7. `filter_energy_subspace`
-8. `filter_unlinked_diagrams` (optional, default ON)
+5. `reclassify_occ_repulsion`
+6. `canonicalize_labels_pdaggerq_style`
+7. `cancel_terms`
+8. `filter_energy_subspace` (optional)
+9. `filter_unlinked_diagrams` (optional)
 
 ## MP2 Walkthrough: Exact Current Behavior
 
@@ -73,12 +74,17 @@ Input used in CLI/tests:
 - Function: `apply_deltas`
 - Output terms: `24`
 
-### Step 5: Canonical Label Rename
+### Step 5: Reclassify occ_repulsion
 
-- Function: `canonicalize_labels`
+- Function: `reclassify_occ_repulsion`
 - Output terms: `24`
 
-### Step 6: Cleanup / Merge Equivalent Terms
+### Step 6: Canonical Label Rename
+
+- Function: `canonicalize_labels_pdaggerq_style`
+- Output terms: `24`
+
+### Step 7: Cleanup / Merge Equivalent Terms
 
 - Function: `cancel_terms`
 - Output terms: `3`
@@ -87,7 +93,7 @@ Input used in CLI/tests:
   - `['+0.250', '<i,j||i,j>', '<k,l||k,l>']`
   - `['-1.00', '<a,i||i,j>', '<j,k||a,k>']`
 
-### Step 6b: Energy-Subspace Projection
+### Step 8: Energy-Subspace Projection
 
 - Function: `filter_energy_subspace`
 - Output terms: `2`
@@ -96,7 +102,7 @@ Input used in CLI/tests:
   - `['+0.250', '<a,b||i,j>', '<i,j||a,b>']`
   - `['+0.250', '<i,j||i,j>', '<k,l||k,l>']`
 
-### Step 6a: Linked-Diagram Filter (default ON)
+### Step 9: Linked-Diagram Filter (default ON)
 
 - Function: `filter_unlinked_diagrams`
 - Output terms: `1`
@@ -114,6 +120,21 @@ For MP2 in this codebase:
 
 So seeing one vs two terms depends on whether you are looking at disconnected/reference pieces or only linked contributions.
 
+## MP3: What We Have Right Now
+
+In parity mode (`filter_unlinked=False`, `project_energy_subspace=False`), current output has 5 terms:
+
+- `['+0.1250', '<a,b||c,d>', '<c,d||i,j>', '<i,j||a,b>']`  -> pp topology
+- `['+0.1250', '<a,b||i,j>', '<i,j||k,l>', '<k,l||a,b>']`  -> hh topology
+- `['-1.00', '<a,c||i,k>', '<b,k||c,j>', '<i,j||a,b>']`    -> ph topology
+- `['-0.1250', '<i,j||i,j>', '<k,l||k,l>', '<m,n||m,n>']`  -> disconnected triple bubble
+- `['-0.3750', '<a,b||i,j>', '<i,j||a,b>', '<k,l||k,l>']`  -> semi-disconnected bubble product
+
+Interpretation:
+
+- The first 3 correspond to textbook MP3 classes (pp/hh/ph).
+- The last 2 are disconnected leftovers that should cancel/drop for connected MP3 correlation energy.
+
 ## Modules
 
 - `wick/term.py`: core data structures and index-space helpers
@@ -122,7 +143,8 @@ So seeing one vs two terms depends on whether you are looking at disconnected/re
 - `wick/step_2_normal_order.py`: Wick normal-order tree generation
 - `wick/step_3_filter.py`: fully-contracted filtering
 - `wick/step_4_deltas.py`: delta elimination
-- `wick/step_5_labels.py`: label canonicalization
+- `wick/step_4b_reclassify.py`: occ-repulsion reclassification
+- `wick/step_5_labels.py`: pdaggerq-style label canonicalization
 - `wick/step_6_cleanup.py`: integral canonicalization + term merging
 - `wick/step_6b_projection.py`: energy-subspace projection
 - `wick/step_6a_linked_cluster.py`: linked-diagram filter
@@ -146,5 +168,4 @@ pytest -q tests/
 
 ## Open Work
 
-Primary remaining task is full MP3 parity with `pdaggerq` at exact-string level.
-This requires deeper alignment with `pdaggerq` cleanup/reclassification behavior beyond current MP2-focused fixes.
+Primary remaining task is to eliminate the two disconnected MP3 leftovers by fixing earlier cancellation/consolidation so connected MP3 reduces cleanly to the expected pp/hh/ph content.

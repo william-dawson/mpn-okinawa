@@ -71,3 +71,42 @@ def canonicalize_labels(terms: List[Term]) -> List[Term]:
         result.append(term.renamed(mapping))
 
     return result
+
+
+def canonicalize_labels_pdaggerq_style(terms: List[Term]) -> List[Term]:
+    """
+    Mirror pdaggerq use_conventional_labels behavior.
+
+    Replace o<n> labels in increasing n order with first free occupied
+    conventional labels, then replace v<n> labels similarly for virtuals.
+    """
+    occ_in = [f"o{i}" for i in range(30)]
+    virt_in = [f"v{i}" for i in range(30)]
+    occ_out = list("ijklmn")
+    virt_out = list("abcdef")
+
+    out = []
+    for term in terms:
+        used = set(_collect_labels_in_order(term))
+        mapping = {}
+
+        for src in occ_in:
+            if src not in used:
+                continue
+            for dst in occ_out:
+                if dst not in used and dst not in mapping.values():
+                    mapping[src] = dst
+                    used.add(dst)
+                    break
+
+        for src in virt_in:
+            if src not in used:
+                continue
+            for dst in virt_out:
+                if dst not in used and dst not in mapping.values():
+                    mapping[src] = dst
+                    used.add(dst)
+                    break
+
+        out.append(term.renamed(mapping))
+    return out
