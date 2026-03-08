@@ -36,6 +36,33 @@ A graph-isomorphism consolidator is available as an **experimental alternative**
 8. `filter_connected_terms_graph` (optional)
 9. `filter_unlinked_diagrams` (optional)
 
+## MP2 Workflow (Theory + Verbose Trace)
+
+You can regenerate this walkthrough with:
+
+```bash
+wick --mp2 --verbose
+```
+
+For MP2 (`['v','v']`), the expected role of each step and the current observed output are:
+
+| Step | Stage | Theory | Observed (`wick --mp2 --verbose`) |
+|---|---|---|---|
+| 1 | `expand_general_labels` | Expand each general index into occupied/virtual assignments. | `400` terms |
+| 2 | `normal_order_fermi_vacuum` | Apply Wick reordering and contraction branching. | `3446` terms |
+| 3 | `filter_fully_contracted` | Keep only vacuum-surviving fully contracted terms. | `38` terms |
+| 4 | `apply_deltas` | Eliminate Kronecker deltas by substitution. | `38` terms (structure simplified) |
+| 5 | `reclassify_occ_repulsion` | Convert `occ_repulsion` intermediates into ERIs. | `38` terms (ERI form) |
+| 6 | `canonicalize_labels_pdaggerq_style` | Normalize dummy labels to conventional symbols. | `38` terms |
+| 7 | `cancel_terms` | Merge equivalent tensor products and sum coefficients. | `2` terms |
+| 8 | `filter_unlinked_diagrams` | Remove disconnected contributions; keep linked energy terms. | `1` term |
+
+Final MP2 term:
+
+```text
++0.250 * <a,b||i,j> * <i,j||a,b> / (e_i + e_j - e_a - e_b)
+```
+
 ## CLI
 
 Run MP examples:

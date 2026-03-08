@@ -1,16 +1,5 @@
 #!/usr/bin/env python
-"""
-Wick's Theorem Engine CLI
-
-Interactive command-line interface for testing and exploring the pipeline.
-
-Usage:
-    python wick_cli.py                          # Start interactive mode
-    python wick_cli.py --mp1                    # Run MP1 example
-    python wick_cli.py --mp2                    # Run MP2 example
-    python wick_cli.py --mp3                    # Run MP3 example
-    python wick_cli.py --verbose --mp2          # Run with detailed output at each step
-"""
+"""Wick's Theorem Engine CLI."""
 
 import sys
 import argparse
@@ -19,8 +8,11 @@ from wick.step_1_expand import expand_general_labels
 from wick.step_2_normal_order import normal_order_fermi_vacuum
 from wick.step_3_filter import filter_fully_contracted
 from wick.step_4_deltas import apply_deltas
+from wick.step_4b_reclassify import reclassify_occ_repulsion
 from wick.step_5_labels import canonicalize_labels_pdaggerq_style
 from wick.step_6_cleanup import cancel_terms
+from wick.step_6d_graph_isomorphism import cancel_terms_graph_isomorphic
+from wick.step_6a_linked_cluster import filter_unlinked_diagrams
 from wick.step_6c_graph_connected import filter_connected_terms_graph
 from wick.step_7_output import format_strings
 from wick.step_8_denominator import extract_denominator
@@ -29,9 +21,9 @@ from wick.term import Term, Tensor
 
 def print_section(title):
     """Print a section header."""
-    print(f"\n{'='*70}")
-    print(f"  {title}")
-    print(f"{'='*70}\n")
+    print(f"\n{'=' * 72}")
+    print(f" {title}")
+    print(f"{'=' * 72}\n")
 
 
 def print_terms(terms, limit=None):
@@ -68,7 +60,9 @@ def print_strings(strings_output, limit=None):
 
     shown = strings_output if limit is None else strings_output[:limit]
     for i, row in enumerate(shown):
-        print(f"  [{i}] {row}")
+        factor = row[0]
+        tensors = " * ".join(row[1:]) if len(row) > 1 else "(scalar)"
+        print(f"  [{i:>2}] {factor:>8} * {tensors}")
 
     if limit is not None and len(strings_output) > limit:
         print(f"  ... and {len(strings_output) - limit} more terms")
@@ -91,7 +85,7 @@ def print_strings_with_denominators(strings_output, denominators, limit=None):
     for i, (row, denom) in enumerate(zip(rows, dens)):
         factor = row[0]
         tensors = ' * '.join(row[1:]) if len(row) > 1 else "(scalar)"
-        print(f"  [{i}] {factor:>8} * {tensors}")
+        print(f"  [{i:>2}] {factor:>8} * {tensors}")
         print(f"         / ({denom})")
 
     if limit is not None and len(strings_output) > limit:
@@ -108,6 +102,71 @@ def pdaggerq_reference_strings(num_v):
     pq.add_operator_product(1.0, ['v'] * num_v)
     pq.simplify()
     return pq.strings()
+
+
+def run_pipeline_verbose(wh, graph_connected_only=False, use_graph_simplification=True):
+    """Run full pipeline with step-by-step verbose output."""
+    print_section("Step 1: General Label Expansion")
+    terms = list(wh._input_terms)
+    counter = [0]
+    terms = expand_general_labels(terms, counter)
+    print(f"Output: {len(terms)} terms")
+    print_terms(terms, limit=3)
+
+    print_section("Step 2: Normal Ordering (Wick's Theorem)")
+    terms = normal_order_fermi_vacuum(terms)
+    print(f"Output: {len(terms)} terms")
+    print_terms(terms, limit=3)
+
+    print_section("Step 3: Filter Fully Contracted")
+    terms = filter_fully_contracted(terms)
+    print(f"Output: {len(terms)} terms")
+    print_terms(terms, limit=3)
+
+    print_section("Step 4: Delta Elimination")
+    terms = apply_deltas(terms)
+    print(f"Output: {len(terms)} terms")
+    print_terms(terms, limit=3)
+
+    print_section("Step 4b: Reclassify occ_repulsion")
+    terms = reclassify_occ_repulsion(terms)
+    print(f"Output: {len(terms)} terms")
+    print_terms(terms, limit=3)
+
+    print_section("Step 5: Label Canonicalization")
+    terms = canonicalize_labels_pdaggerq_style(terms)
+    print(f"Output: {len(terms)} terms")
+    print_terms(terms, limit=3)
+
+    print_section("Step 6: Consolidation")
+    if use_graph_simplification:
+        terms = cancel_terms_graph_isomorphic(terms)
+    else:
+        terms = cancel_terms(terms)
+    print(f"Output: {len(terms)} terms")
+    print_terms(terms, limit=3)
+
+    if graph_connected_only:
+        print_section("Step 6c: Graph Connected Filter")
+        terms = filter_connected_terms_graph(terms)
+        print(f"Output: {len(terms)} terms")
+        print_terms(terms, limit=3)
+
+    print_section("Step 6a: Linked-Diagram Filter")
+    terms = filter_unlinked_diagrams(terms)
+    print(f"Output: {len(terms)} terms")
+    print_terms(terms, limit=3)
+
+    print_section("Step 7: Format Strings")
+    result = format_strings(terms)
+    print(f"Output: {len(result)} terms")
+    print_strings(result)
+
+    print_section("Step 8: Energy Denominator Extraction")
+    denoms = [extract_denominator(term) for term in terms]
+    print(f"Output: {len(denoms)} denominators")
+    print_strings_with_denominators(result, denoms)
+    return result, denoms
 
 
 def run_mp12(verbose=False, graph_connected_only=False, use_graph_simplification=True, show_reference=False):
@@ -135,9 +194,17 @@ def run_mp12(verbose=False, graph_connected_only=False, use_graph_simplification
     wh.add_operator_product(1.0, ["v", "v"])
 
     print_section("Running Pipeline")
-    wh.simplify()
-    result = sorted(wh.strings())
-    denoms = [extract_denominator(t) for t in sorted(wh._result, key=lambda x: str(format_strings([x])[0]))]
+    if verbose:
+        result, denoms = run_pipeline_verbose(
+            wh,
+            graph_connected_only=graph_connected_only,
+            use_graph_simplification=use_graph_simplification,
+        )
+        result = sorted(result)
+    else:
+        wh.simplify()
+        result = sorted(wh.strings())
+        denoms = [extract_denominator(t) for t in sorted(wh._result, key=lambda x: str(format_strings([x])[0]))]
     print(f"Our combined output ({len(result)} terms) with energy denominators:")
     print_strings_with_denominators(result, denoms)
     if ref_strings is not None:
@@ -175,9 +242,17 @@ def run_mp123(verbose=False, graph_connected_only=False, use_graph_simplificatio
     wh.add_operator_product(1.0, ["v", "v", "v"])
 
     print_section("Running Pipeline")
-    wh.simplify()
-    result = sorted(wh.strings())
-    denoms = [extract_denominator(t) for t in sorted(wh._result, key=lambda x: str(format_strings([x])[0]))]
+    if verbose:
+        result, denoms = run_pipeline_verbose(
+            wh,
+            graph_connected_only=graph_connected_only,
+            use_graph_simplification=use_graph_simplification,
+        )
+        result = sorted(result)
+    else:
+        wh.simplify()
+        result = sorted(wh.strings())
+        denoms = [extract_denominator(t) for t in sorted(wh._result, key=lambda x: str(format_strings([x])[0]))]
     print(f"Our combined output ({len(result)} terms) with energy denominators:")
     print_strings_with_denominators(result, denoms)
     if ref_strings is not None:
@@ -240,134 +315,61 @@ def run_example(
             print(f"Exact string match vs pdaggerq: {sorted(result) == sorted(ref_strings)}")
         return result
 
-    # Verbose mode: step through each stage
-    print_section("Step 1: General Label Expansion")
-    terms = list(wh._input_terms)
-    counter = [0]
-    terms = expand_general_labels(terms, counter)
-    print(f"Output: {len(terms)} terms")
-    print_terms(terms, limit=3)
-
-    print_section("Step 2: Normal Ordering (Wick's Theorem)")
-    terms = normal_order_fermi_vacuum(terms)
-    print(f"Output: {len(terms)} terms")
-    print_terms(terms, limit=3)
-
-    print_section("Step 3: Filter Fully Contracted")
-    terms = filter_fully_contracted(terms)
-    print(f"Output: {len(terms)} terms")
-    print_terms(terms, limit=3)
-
-    print_section("Step 4: Delta Elimination")
-    terms = apply_deltas(terms)
-    print(f"Output: {len(terms)} terms")
-    print_terms(terms, limit=3)
-
-    print_section("Step 5: Label Canonicalization")
-    terms = canonicalize_labels_pdaggerq_style(terms)
-    print(f"Output: {len(terms)} terms")
-    print_terms(terms, limit=3)
-
-    print_section("Step 6: Cleanup & ERI Canonicalization")
-    terms = cancel_terms(terms)
-    print(f"Output: {len(terms)} terms")
-    print_terms(terms, limit=3)
-
-    if graph_connected_only:
-        print_section("Step 6c: Graph Connected Filter")
-        terms = filter_connected_terms_graph(terms)
-        print(f"Output: {len(terms)} terms")
-        print_terms(terms, limit=3)
-
-    print_section("Step 7: Format Strings")
-    result = format_strings(terms)
-    print(f"Output: {len(result)} terms")
-    print_strings(result)
-
-    print_section("Step 8: Energy Denominator Extraction")
-    denoms = [extract_denominator(term) for term in terms]
-    print(f"Output: {len(denoms)} denominators")
-    print_strings_with_denominators(result, denoms)
+    result, _ = run_pipeline_verbose(
+        wh,
+        graph_connected_only=graph_connected_only,
+        use_graph_simplification=use_graph_simplification,
+    )
     if ref_strings is not None:
         print(f"Exact string match vs pdaggerq: {sorted(result) == sorted(ref_strings)}")
 
     return result
 
 
-def interactive_mode(graph_connected_only=False, use_graph_simplification=True, show_reference=False):
-    """Interactive command loop."""
-    print_section("Wick's Theorem Engine - Interactive Mode")
-    print("""Commands:
-  mp1                 Run MP1 example
-  mp2                 Run MP2 example
-  mp12                Run MP1+MP2 combined
-  mp123               Run MP1+MP2+MP3 combined
-  mp3                 Run MP3 example
-  mp4                 Run MP4 example (SLOW - 65K+ terms)
-  custom              Enter custom input
-  help                Show this help
-  quit/exit           Exit
-""")
+def run_mpn(order, verbose=False, graph_connected_only=False, use_graph_simplification=True, show_reference=False):
+    """Run generic MPn using n copies of the fluctuation potential operator."""
+    if order < 1:
+        raise ValueError("MP order must be >= 1")
 
-    while True:
+    print_section(f"Running MP{order}")
+    print("Input:")
+    print(f"  operator product = ['v'] * {order}")
+
+    ref_strings = None
+    if show_reference:
         try:
-            cmd = input("wick> ").strip().lower()
+            ref_strings = sorted(pdaggerq_reference_strings(order))
+            print_section("Reference (pdaggerq)")
+            print(f"pdaggerq output ({len(ref_strings)} terms):")
+            print_strings(ref_strings)
+        except Exception as exc:
+            print_section("Reference (pdaggerq)")
+            print(f"Could not compute pdaggerq reference: {exc}")
 
-            if not cmd:
-                continue
-            elif cmd == "mp1":
-                run_example("MP1", 1/4, ['g(p,q,r,s)'], ['+p','+q','-r','-s'], use_v_product=True, graph_connected_only=graph_connected_only, use_graph_simplification=use_graph_simplification, show_reference=show_reference)
-            elif cmd == "mp2":
-                run_example("MP2", 1/16, ['g(p,q,r,s)', 'g(t,u,v,w)'],
-                           ['+p','+q','-r','-s','+t','+u','-v','-w'], use_v_product=True, graph_connected_only=graph_connected_only, use_graph_simplification=use_graph_simplification, show_reference=show_reference)
-            elif cmd == "mp12":
-                run_mp12(graph_connected_only=graph_connected_only, use_graph_simplification=use_graph_simplification, show_reference=show_reference)
-            elif cmd == "mp123":
-                run_mp123(graph_connected_only=graph_connected_only, use_graph_simplification=use_graph_simplification, show_reference=show_reference)
-            elif cmd == "mp3":
-                run_example("MP3", 1/64,
-                           ['g(p,q,r,s)', 'g(t,u,v,w)', 'g(x,y,z,o)'],
-                           ['+p','+q','-r','-s', '+t','+u','-v','-w', '+x','+y','-z','-o'], use_v_product=True, graph_connected_only=graph_connected_only, use_graph_simplification=use_graph_simplification, show_reference=show_reference)
-            elif cmd == "mp4":
-                print("\nWARNING: MP4 is very slow (65K+ initial terms).")
-                confirm = input("Continue? (y/n): ").strip().lower()
-                if confirm == 'y':
-                    import time
-                    t_start = time.time()
-                    run_example("MP4", 1/256,
-                               ['g(p,q,r,s)', 'g(t,u,v,w)', 'g(x,y,z,o)', 'g(p1,q1,r1,s1)'],
-                               ['+p','+q','-r','-s', '+t','+u','-v','-w', '+x','+y','-z','-o', '+p1','+q1','-r1','-s1'], use_v_product=True, graph_connected_only=graph_connected_only, use_graph_simplification=use_graph_simplification, show_reference=show_reference)
-                    elapsed = time.time() - t_start
-                    print_section("Timing")
-                    print(f"MP4 completed in {elapsed:.1f} seconds")
-            elif cmd == "custom":
-                print("\nEnter custom input:")
-                factor = float(input("  factor: "))
-                tensors_str = input("  tensors (comma-separated, e.g. 'g(p,q,r,s), g(a,b,c,d)'): ")
-                tensors = [t.strip() for t in tensors_str.split(",")]
-                ops_str = input("  ops (comma-separated, e.g. '+p, +q, -s, -r'): ")
-                ops = [o.strip() for o in ops_str.split(",")]
+    wh = WickHelper(
+        filter_unlinked=True,
+        graph_connected_only=graph_connected_only,
+        use_graph_simplification=use_graph_simplification,
+    )
+    wh.add_operator_product(1.0, ["v"] * order)
 
-                run_example("Custom", factor, tensors, ops, graph_connected_only=graph_connected_only, use_graph_simplification=use_graph_simplification, show_reference=show_reference)
-            elif cmd in ["help", "h", "?"]:
-                print("""Commands:
-  mp1                 Run MP1 example
-  mp2                 Run MP2 example
-  mp3                 Run MP3 example
-  custom              Enter custom input
-  help                Show this help
-  quit/exit           Exit
-""")
-            elif cmd in ["quit", "exit", "q"]:
-                print("Exiting.")
-                sys.exit(0)
-            else:
-                print(f"Unknown command: {cmd}. Type 'help' for options.")
-        except KeyboardInterrupt:
-            print("\nExiting.")
-            sys.exit(0)
-        except Exception as e:
-            print(f"Error: {e}")
+    print_section("Running Pipeline")
+    if verbose:
+        result, denoms = run_pipeline_verbose(
+            wh,
+            graph_connected_only=graph_connected_only,
+            use_graph_simplification=use_graph_simplification,
+        )
+    else:
+        wh.simplify()
+        result = wh.strings()
+        denoms = wh.denominators()
+        print(f"Our output ({len(result)} terms) with energy denominators:")
+        print_strings_with_denominators(result, denoms)
+
+    if ref_strings is not None:
+        print(f"Exact string match vs pdaggerq: {sorted(result) == sorted(ref_strings)}")
+    return result
 
 
 def main():
@@ -375,15 +377,17 @@ def main():
         description="Wick's Theorem Engine CLI",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
-  python wick_cli.py --mp1                    # Run MP1
-  python wick_cli.py --mp2 --verbose          # Run MP2 with step-by-step output
-  python wick_cli.py --mp4                    # Run MP4 (slow!)
-  python wick_cli.py                          # Interactive mode
+  wick --mp1
+  wick --mp2 --verbose
+  wick --mp 5 --verbose
+  wick --mp12
+  wick --mp123 --reference
 """
     )
 
     parser.add_argument('--mp1', action='store_true', help='Run MP1 example')
     parser.add_argument('--mp2', action='store_true', help='Run MP2 example')
+    parser.add_argument('--mp', type=int, default=None, help='Run generic MPn (e.g. --mp 5)')
     parser.add_argument('--mp12', action='store_true', help='Run MP1+MP2 combined example')
     parser.add_argument('--mp123', action='store_true', help='Run MP1+MP2+MP3 combined example')
     parser.add_argument('--mp3', action='store_true', help='Run MP3 example')
@@ -400,7 +404,19 @@ def main():
     args = parser.parse_args()
 
     # Determine what to run
-    if args.mp1:
+    if not any([args.mp1, args.mp2, args.mp12, args.mp123, args.mp3, args.mp4, args.mp is not None]):
+        parser.print_help()
+        return
+
+    if args.mp is not None:
+        run_mpn(
+            args.mp,
+            verbose=args.verbose,
+            graph_connected_only=args.graph_connected,
+            use_graph_simplification=args.graph_simplify,
+            show_reference=args.reference,
+        )
+    elif args.mp1:
         run_example("MP1", 1/4, ['g(p,q,r,s)'], ['+p','+q','-r','-s'], args.verbose, use_v_product=True, graph_connected_only=args.graph_connected, use_graph_simplification=args.graph_simplify, show_reference=args.reference)
     elif args.mp2:
         run_example("MP2", 1/16, ['g(p,q,r,s)', 'g(t,u,v,w)'],
@@ -430,10 +446,5 @@ def main():
         except KeyboardInterrupt:
             print("\n\nInterrupted by user.")
             sys.exit(1)
-    else:
-        # Interactive mode
-        interactive_mode(graph_connected_only=args.graph_connected, use_graph_simplification=args.graph_simplify, show_reference=args.reference)
-
-
 if __name__ == '__main__':
     main()
