@@ -26,7 +26,7 @@ Pipeline (in order)
   3. filter_fully_contracted  - drop uncontracted terms
   4. apply_deltas             - substitute and remove delta functions
   5. canonicalize_labels      - rename to i,j,k.../a,b,c...
-  6. cancel_terms             - sum identical terms, drop zeros
+  6. term consolidation - manual by default; graph mode optional
   7. format_strings           - convert to pdaggerq string format
 """
 
@@ -42,8 +42,8 @@ from .step_4_deltas         import apply_deltas
 from .step_4b_reclassify    import reclassify_occ_repulsion
 from .step_5_labels         import canonicalize_labels_pdaggerq_style
 from .step_6_cleanup        import cancel_terms
+from .step_6d_graph_isomorphism import cancel_terms_graph_isomorphic
 from .step_6a_linked_cluster import filter_unlinked_diagrams
-from .step_6b_projection    import filter_energy_subspace
 from .step_6c_graph_connected import filter_connected_terms_graph
 from .step_7_output         import format_strings
 from .step_8_denominator    import extract_denominator
@@ -82,14 +82,14 @@ class WickHelper:
     def __init__(
         self,
         filter_unlinked: bool = True,
-        project_energy_subspace: bool = True,
         graph_connected_only: bool = False,
+        use_graph_simplification: bool = False,
     ):
         self._input_terms: List[Term] = []
         self._result:      List[Term] = []
         self._filter_unlinked = filter_unlinked
-        self._project_energy_subspace = project_energy_subspace
         self._graph_connected_only = graph_connected_only
+        self._use_graph_simplification = use_graph_simplification
 
     def add_term(
         self,
@@ -177,16 +177,15 @@ class WickHelper:
         # 5. Canonicalize index labels
         terms = canonicalize_labels_pdaggerq_style(terms)
 
-        # 6. Cancel duplicate terms / sum factors
-        terms = cancel_terms(terms)
+        # 6. Consolidate duplicate terms / sum factors.
+        if self._use_graph_simplification:
+            terms = cancel_terms_graph_isomorphic(terms)
+        else:
+            terms = cancel_terms(terms)
 
         # 6c. Optional graph-based connected filter.
         if self._graph_connected_only:
             terms = filter_connected_terms_graph(terms)
-
-        # 6b. Project out odd occupied/virtual balance terms (MP energy subspace)
-        if self._project_energy_subspace:
-            terms = filter_energy_subspace(terms)
 
         # 6a. Optional: filter unlinked (disconnected) diagrams via linked-cluster theorem
         if self._filter_unlinked:

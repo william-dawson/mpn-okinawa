@@ -21,7 +21,7 @@ def pdaggerq_mp3_rows():
 
 
 def ours_mp3_rows():
-    wh = WickHelper(filter_unlinked=False, project_energy_subspace=False)
+    wh = WickHelper(filter_unlinked=False)
     wh.add_operator_product(1.0, ["v", "v", "v"])
     wh.simplify()
     return sorted(wh.strings())

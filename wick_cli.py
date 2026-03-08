@@ -117,6 +117,7 @@ def run_example(
     verbose=False,
     use_v_product=False,
     graph_connected_only=False,
+    use_graph_simplification=True,
 ):
     """Run an example through the full pipeline with optional verbosity."""
     print_section(f"Running {name.upper()}")
@@ -139,11 +140,11 @@ def run_example(
             print(f"Could not compute pdaggerq reference: {exc}")
 
     # Create the term
-    # Keep CLI examples aligned with pdaggerq strings() reference behavior.
+    # Default CLI view: linked contributions with no energy-subspace projection.
     wh = WickHelper(
-        filter_unlinked=False,
-        project_energy_subspace=False,
+        filter_unlinked=True,
         graph_connected_only=graph_connected_only,
+        use_graph_simplification=use_graph_simplification,
     )
     if use_v_product:
         wh.add_operator_product(1.0, ["v"] * len(tensors))
@@ -216,7 +217,7 @@ def run_example(
     return result
 
 
-def interactive_mode(graph_connected_only=False):
+def interactive_mode(graph_connected_only=False, use_graph_simplification=True):
     """Interactive command loop."""
     print_section("Wick's Theorem Engine - Interactive Mode")
     print("""Commands:
@@ -236,14 +237,14 @@ def interactive_mode(graph_connected_only=False):
             if not cmd:
                 continue
             elif cmd == "mp1":
-                run_example("MP1", 1/4, ['g(p,q,r,s)'], ['+p','+q','-r','-s'], use_v_product=True, graph_connected_only=graph_connected_only)
+                run_example("MP1", 1/4, ['g(p,q,r,s)'], ['+p','+q','-r','-s'], use_v_product=True, graph_connected_only=graph_connected_only, use_graph_simplification=use_graph_simplification)
             elif cmd == "mp2":
                 run_example("MP2", 1/16, ['g(p,q,r,s)', 'g(t,u,v,w)'],
-                           ['+p','+q','-r','-s','+t','+u','-v','-w'], use_v_product=True, graph_connected_only=graph_connected_only)
+                           ['+p','+q','-r','-s','+t','+u','-v','-w'], use_v_product=True, graph_connected_only=graph_connected_only, use_graph_simplification=use_graph_simplification)
             elif cmd == "mp3":
                 run_example("MP3", 1/64,
                            ['g(p,q,r,s)', 'g(t,u,v,w)', 'g(x,y,z,o)'],
-                           ['+p','+q','-r','-s', '+t','+u','-v','-w', '+x','+y','-z','-o'], use_v_product=True, graph_connected_only=graph_connected_only)
+                           ['+p','+q','-r','-s', '+t','+u','-v','-w', '+x','+y','-z','-o'], use_v_product=True, graph_connected_only=graph_connected_only, use_graph_simplification=use_graph_simplification)
             elif cmd == "mp4":
                 print("\nWARNING: MP4 is very slow (65K+ initial terms).")
                 confirm = input("Continue? (y/n): ").strip().lower()
@@ -252,7 +253,7 @@ def interactive_mode(graph_connected_only=False):
                     t_start = time.time()
                     run_example("MP4", 1/256,
                                ['g(p,q,r,s)', 'g(t,u,v,w)', 'g(x,y,z,o)', 'g(p1,q1,r1,s1)'],
-                               ['+p','+q','-r','-s', '+t','+u','-v','-w', '+x','+y','-z','-o', '+p1','+q1','-r1','-s1'], use_v_product=True, graph_connected_only=graph_connected_only)
+                               ['+p','+q','-r','-s', '+t','+u','-v','-w', '+x','+y','-z','-o', '+p1','+q1','-r1','-s1'], use_v_product=True, graph_connected_only=graph_connected_only, use_graph_simplification=use_graph_simplification)
                     elapsed = time.time() - t_start
                     print_section("Timing")
                     print(f"MP4 completed in {elapsed:.1f} seconds")
@@ -264,7 +265,7 @@ def interactive_mode(graph_connected_only=False):
                 ops_str = input("  ops (comma-separated, e.g. '+p, +q, -s, -r'): ")
                 ops = [o.strip() for o in ops_str.split(",")]
 
-                run_example("Custom", factor, tensors, ops, graph_connected_only=graph_connected_only)
+                run_example("Custom", factor, tensors, ops, graph_connected_only=graph_connected_only, use_graph_simplification=use_graph_simplification)
             elif cmd in ["help", "h", "?"]:
                 print("""Commands:
   mp1                 Run MP1 example
@@ -306,20 +307,22 @@ def main():
                        help='Show detailed output for each pipeline step')
     parser.add_argument('--graph-connected', action='store_true',
                        help='Enable graph-based connected-term filtering after cleanup')
+    parser.add_argument('--graph-simplify', action='store_true',
+                       help='Use graph-isomorphic simplification (experimental)')
 
     args = parser.parse_args()
 
     # Determine what to run
     if args.mp1:
-        run_example("MP1", 1/4, ['g(p,q,r,s)'], ['+p','+q','-r','-s'], args.verbose, use_v_product=True, graph_connected_only=args.graph_connected)
+        run_example("MP1", 1/4, ['g(p,q,r,s)'], ['+p','+q','-r','-s'], args.verbose, use_v_product=True, graph_connected_only=args.graph_connected, use_graph_simplification=args.graph_simplify)
     elif args.mp2:
         run_example("MP2", 1/16, ['g(p,q,r,s)', 'g(t,u,v,w)'],
-                   ['+p','+q','-r','-s','+t','+u','-v','-w'], args.verbose, use_v_product=True, graph_connected_only=args.graph_connected)
+                   ['+p','+q','-r','-s','+t','+u','-v','-w'], args.verbose, use_v_product=True, graph_connected_only=args.graph_connected, use_graph_simplification=args.graph_simplify)
     elif args.mp3:
         run_example("MP3", 1/64,
                    ['g(p,q,r,s)', 'g(t,u,v,w)', 'g(x,y,z,o)'],
                    ['+p','+q','-r','-s', '+t','+u','-v','-w', '+x','+y','-z','-o'],
-                   args.verbose, use_v_product=True, graph_connected_only=args.graph_connected)
+                   args.verbose, use_v_product=True, graph_connected_only=args.graph_connected, use_graph_simplification=args.graph_simplify)
     elif args.mp4:
         import time
         print_section("MP4 - WARNING: This is slow (65K+ initial terms)")
@@ -329,7 +332,7 @@ def main():
             run_example("MP4", 1/256,
                        ['g(p,q,r,s)', 'g(t,u,v,w)', 'g(x,y,z,o)', 'g(p1,q1,r1,s1)'],
                        ['+p','+q','-r','-s', '+t','+u','-v','-w', '+x','+y','-z','-o', '+p1','+q1','-r1','-s1'],
-                       args.verbose, use_v_product=True, graph_connected_only=args.graph_connected)
+                       args.verbose, use_v_product=True, graph_connected_only=args.graph_connected, use_graph_simplification=args.graph_simplify)
             elapsed = time.time() - t_start
             print_section("Timing")
             print(f"MP4 completed in {elapsed:.1f} seconds")
@@ -338,7 +341,7 @@ def main():
             sys.exit(1)
     else:
         # Interactive mode
-        interactive_mode(graph_connected_only=args.graph_connected)
+        interactive_mode(graph_connected_only=args.graph_connected, use_graph_simplification=args.graph_simplify)
 
 
 if __name__ == '__main__':
