@@ -6,6 +6,8 @@
 
 use std::collections::HashMap;
 
+use rustc_hash::FxHashMap;
+
 use crate::term::{is_occ, is_virt, Tensor, Term};
 
 const EPSILON: f64 = 1e-12;
@@ -164,7 +166,7 @@ fn permutations(items: &[String]) -> Vec<Vec<String>> {
 
 pub fn cancel_terms(terms: &[Term]) -> Vec<Term> {
     let mut buckets: Vec<(TermCanonKey, f64)> = Vec::new();
-    let mut key_index: HashMap<TermCanonKey, usize> = HashMap::new();
+    let mut key_index: FxHashMap<TermCanonKey, usize> = FxHashMap::default();
 
     for term in terms {
         let (key, canon_sign) = term_key(term);

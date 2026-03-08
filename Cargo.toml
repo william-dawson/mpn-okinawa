@@ -15,5 +15,6 @@ path = "src/lib.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
+rustc-hash = "2"
 
 [dev-dependencies]

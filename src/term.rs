@@ -39,7 +39,7 @@ pub fn is_general(label: &str) -> bool {
 
 // ── Operator ────────────────────────────────────────────────────────────────
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Operator {
     pub label: String,
     pub dagger: bool,
@@ -151,7 +151,7 @@ impl fmt::Debug for Tensor {
 
 // ── Delta ───────────────────────────────────────────────────────────────────
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Delta {
     pub i: String,
     pub j: String,
